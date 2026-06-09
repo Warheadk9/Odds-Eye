@@ -1,0 +1,1933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OddsEye — Live Match Reader</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;600&family=Inter:wght@300;400;500;700&display=swap');
+
+  :root {
+    --bg: #080c10;
+    --surface: #0d1117;
+    --card: #111820;
+    --border: #1e2d3d;
+    --green: #00ff88;
+    --red: #ff3355;
+    --amber: #ffb830;
+    --blue: #3b8bff;
+    --text: #e8edf3;
+    --muted: #4a5568;
+    --dim: #2a3444;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* animated grid bg */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,136,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,136,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 16px;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 2.2rem;
+    letter-spacing: 2px;
+    color: var(--green);
+    text-shadow: 0 0 30px rgba(0,255,136,0.4);
+  }
+
+  .logo span {
+    color: var(--text);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    font-size: 0.75rem;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--muted);
+    transition: all 0.3s;
+  }
+
+  .status-pill.active {
+    border-color: var(--green);
+    color: var(--green);
+    box-shadow: 0 0 15px rgba(0,255,136,0.15);
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s;
+  }
+
+  .status-pill.active .status-dot {
+    background: var(--green);
+    animation: pulse 1.5s infinite;
+  }
+
+  .arb-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    font-size: 0.75rem;
+    font-family: 'IBM Plex Mono', monospace;
+    color: var(--muted);
+    transition: all 0.3s;
+  }
+
+  .arb-pill.connected {
+    border-color: var(--amber);
+    color: var(--amber);
+    box-shadow: 0 0 15px rgba(255,184,48,0.15);
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
+  }
+
+  /* CONTROLS */
+  .controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  .btn {
+    padding: 14px 24px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn:hover { transform: translateY(-1px); }
+
+  .btn-start {
+    border-color: var(--green);
+    color: var(--green);
+    background: rgba(0,255,136,0.05);
+  }
+
+  .btn-start:hover {
+    background: rgba(0,255,136,0.12);
+    box-shadow: 0 0 20px rgba(0,255,136,0.2);
+  }
+
+  .btn-start:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-stop {
+    border-color: var(--red);
+    color: var(--red);
+    background: rgba(255,51,85,0.05);
+  }
+
+  .btn-stop:hover {
+    background: rgba(255,51,85,0.12);
+    box-shadow: 0 0 20px rgba(255,51,85,0.2);
+  }
+
+  .btn-stop:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* PREVIEW */
+  .preview-section {
+    margin-bottom: 28px;
+  }
+
+  .section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 10px;
+  }
+
+  .preview-box {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .preview-box video {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  .preview-placeholder {
+    text-align: center;
+    color: var(--muted);
+  }
+
+  .preview-placeholder .icon {
+    font-size: 3rem;
+    margin-bottom: 12px;
+    display: block;
+    opacity: 0.4;
+  }
+
+  .preview-placeholder p {
+    font-size: 0.85rem;
+  }
+
+  .scan-bar {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+    animation: scan 2s linear infinite;
+    box-shadow: 0 0 10px var(--green);
+  }
+
+  .scanning .scan-bar { display: block; }
+
+  @keyframes scan {
+    0% { top: 0; }
+    100% { top: 100%; }
+  }
+
+  /* SCAN INTERVAL */
+  .interval-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 28px;
+    padding: 14px 18px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+
+  .interval-row label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    white-space: nowrap;
+  }
+
+  .interval-row input[type=range] {
+    flex: 1;
+    accent-color: var(--green);
+    cursor: pointer;
+  }
+
+  .interval-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--green);
+    min-width: 40px;
+    text-align: right;
+  }
+
+  /* ARB ALERTS SECTION */
+  .arb-section {
+    margin-bottom: 28px;
+  }
+
+  .arb-alert {
+    background: rgba(0,255,136,0.05);
+    border: 1px solid rgba(0,255,136,0.3);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 10px;
+    animation: arbPop 0.4s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .arb-alert::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 4px;
+    background: var(--green);
+    border-radius: 4px 0 0 4px;
+  }
+
+  @keyframes arbPop {
+    from { opacity: 0; transform: scale(0.97); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .arb-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .arb-profit {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.8rem;
+    color: var(--green);
+    letter-spacing: 2px;
+    text-shadow: 0 0 20px rgba(0,255,136,0.5);
+  }
+
+  .arb-sport-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    padding: 3px 10px;
+    border-radius: 4px;
+    background: rgba(59,139,255,0.15);
+    color: var(--blue);
+    border: 1px solid rgba(59,139,255,0.3);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .arb-match {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .arb-market {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--amber);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .arb-legs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .arb-leg {
+    background: var(--surface);
+    border: 1px solid var(--dim);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .arb-leg-bookie {
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    margin-bottom: 4px;
+  }
+
+  .arb-leg-pick {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .arb-leg-odds {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.3rem;
+    color: var(--green);
+    letter-spacing: 1px;
+  }
+
+  .arb-sent-badge {
+    margin-top: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--green);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .arb-sent-badge::before {
+    content: '⚡';
+  }
+
+  /* MATCHES OUTPUT */
+  .matches-section { margin-bottom: 28px; }
+
+  .matches-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .match-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--green);
+    background: rgba(0,255,136,0.08);
+    border: 1px solid rgba(0,255,136,0.2);
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+
+  .btn-clear {
+    font-size: 0.75rem;
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--dim);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-family: 'IBM Plex Mono', monospace;
+    transition: all 0.2s;
+  }
+
+  .btn-clear:hover { color: var(--red); border-color: var(--red); }
+
+  .matches-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .match-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 20px;
+    animation: slideIn 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .match-card::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: var(--green);
+    border-radius: 3px 0 0 3px;
+  }
+
+  .match-card.live::before { background: var(--red); }
+  .match-card.hot::before { background: var(--amber); }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .match-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .match-time {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--amber);
+    font-weight: 600;
+  }
+
+  .match-league {
+    font-size: 0.72rem;
+    color: var(--muted);
+    flex: 1;
+  }
+
+  .live-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: rgba(255,51,85,0.15);
+    color: var(--red);
+    border: 1px solid rgba(255,51,85,0.3);
+    letter-spacing: 1px;
+  }
+
+  .hot-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: rgba(255,184,48,0.15);
+    color: var(--amber);
+    border: 1px solid rgba(255,184,48,0.3);
+    letter-spacing: 1px;
+  }
+
+  .teams {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .team-name {
+    font-size: 1rem;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+
+  .score {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.4rem;
+    color: var(--green);
+    letter-spacing: 3px;
+  }
+
+  /* Multi-market odds display */
+  .markets-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .market-group {
+    background: var(--surface);
+    border: 1px solid var(--dim);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+
+  .market-name {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+
+  .odds-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .odd-box {
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--dim);
+    border-radius: 6px;
+    padding: 5px 8px;
+    text-align: center;
+    transition: all 0.2s;
+    flex: 1;
+    min-width: 60px;
+  }
+
+  .odd-box:hover {
+    border-color: var(--green);
+    background: rgba(0,255,136,0.05);
+  }
+
+  .odd-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .odd-value {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 1.2rem;
+    color: var(--green);
+    letter-spacing: 1px;
+  }
+
+  .odd-value.high { color: var(--amber); }
+  .odd-value.very-high { color: var(--red); }
+
+  .bookie-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    color: var(--blue);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    letter-spacing: 1px;
+  }
+
+  /* EMPTY STATE */
+  .empty-state {
+    text-align: center;
+    padding: 48px 24px;
+    background: var(--card);
+    border: 1px dashed var(--dim);
+    border-radius: 12px;
+    color: var(--muted);
+  }
+
+  .empty-state .big-icon {
+    font-size: 2.5rem;
+    margin-bottom: 14px;
+    opacity: 0.4;
+  }
+
+  .empty-state p { font-size: 0.85rem; line-height: 1.7; }
+
+  /* LOG */
+  .log-section { margin-bottom: 24px; }
+
+  .log-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--muted);
+    height: 100px;
+    overflow-y: auto;
+    line-height: 1.8;
+  }
+
+  .log-line { display: block; }
+  .log-line.ok { color: var(--green); }
+  .log-line.err { color: var(--red); }
+  .log-line.info { color: var(--blue); }
+  .log-line.arb { color: var(--amber); font-weight: 600; }
+
+  /* HIDDEN */
+  #videoEl { display: none; }
+  #canvasEl { display: none; }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--dim); border-radius: 4px; }
+
+  /* API KEY SETUP */
+  .api-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .api-input {
+    flex: 1;
+    padding: 11px 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .api-input:focus { border-color: var(--green); }
+  .api-input::placeholder { color: var(--muted); }
+
+  .btn-save {
+    padding: 11px 18px;
+    border-radius: 8px;
+    border: 1px solid var(--blue);
+    background: rgba(59,139,255,0.08);
+    color: var(--blue);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+  }
+
+  .btn-save:hover { background: rgba(59,139,255,0.15); }
+
+  /* INFO BOX */
+  .info-box {
+    background: rgba(59,139,255,0.06);
+    border: 1px solid rgba(59,139,255,0.2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 20px;
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .info-box strong { color: var(--blue); }
+
+  .threshold-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    padding: 14px 18px;
+    background: var(--card);
+    border: 1px solid rgba(0,255,136,0.2);
+    border-radius: 10px;
+  }
+
+  .threshold-row label {
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-family: 'IBM Plex Mono', monospace;
+    white-space: nowrap;
+  }
+
+  .threshold-row input[type=range] {
+    flex: 1;
+    accent-color: var(--green);
+    cursor: pointer;
+  }
+
+  .threshold-val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    color: var(--green);
+    min-width: 50px;
+    text-align: right;
+  }
+
+  /* MODE SWITCHER */
+  .mode-switcher {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    margin-bottom: 24px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .mode-btn {
+    padding: 16px 12px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.25s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    letter-spacing: 0.3px;
+    border-bottom: 2px solid transparent;
+  }
+
+  .mode-btn:first-child {
+    border-right: 1px solid var(--border);
+  }
+
+  .mode-btn.active {
+    background: rgba(0,255,136,0.07);
+    color: var(--green);
+    border-bottom: 2px solid var(--green);
+  }
+
+  .mode-btn .mode-icon {
+    font-size: 1.1rem;
+  }
+
+  .mode-badge {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    letter-spacing: 0.5px;
+  }
+
+  .mode-btn.active .mode-badge {
+    background: rgba(0,255,136,0.15);
+    color: var(--green);
+    border: 1px solid rgba(0,255,136,0.3);
+  }
+
+  .mode-btn:not(.active) .mode-badge {
+    background: rgba(74,85,104,0.2);
+    color: var(--muted);
+    border: 1px solid var(--dim);
+  }
+
+  .mode-panel { display: none; }
+  .mode-panel.active { display: block; }
+
+  /* SCREENSHOT MODE */
+  .upload-zone {
+    width: 100%;
+    min-height: 160px;
+    background: var(--card);
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.25s;
+    margin-bottom: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--green);
+    background: rgba(0,255,136,0.04);
+  }
+
+  .upload-zone input[type=file] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon {
+    font-size: 2.5rem;
+    opacity: 0.5;
+  }
+
+  .upload-label {
+    font-size: 0.9rem;
+    color: var(--muted);
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  .upload-label strong {
+    color: var(--green);
+    display: block;
+    font-size: 1rem;
+    margin-bottom: 4px;
+  }
+
+  .upload-hint {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .screenshot-preview {
+    width: 100%;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    margin-bottom: 16px;
+    display: none;
+    position: relative;
+  }
+
+  .screenshot-preview img {
+    width: 100%;
+    display: block;
+    max-height: 300px;
+    object-fit: contain;
+    background: var(--surface);
+  }
+
+  .screenshot-preview .remove-img {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255,51,85,0.8);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-weight: 700;
+  }
+
+  .btn-scan-shot {
+    width: 100%;
+    padding: 16px;
+    border-radius: 10px;
+    border: 1px solid var(--green);
+    background: rgba(0,255,136,0.07);
+    color: var(--green);
+    font-family: 'Inter', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-scan-shot:hover {
+    background: rgba(0,255,136,0.14);
+    box-shadow: 0 0 24px rgba(0,255,136,0.2);
+    transform: translateY(-1px);
+  }
+
+  .btn-scan-shot:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .scanning-overlay {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px;
+    background: rgba(0,255,136,0.06);
+    border: 1px solid rgba(0,255,136,0.2);
+    border-radius: 10px;
+    margin-bottom: 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    color: var(--green);
+  }
+
+  .scanning-overlay.active { display: flex; }
+
+  .spin {
+    animation: spin 1s linear infinite;
+    font-size: 1.1rem;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">Odds<span>Eye</span></div>
+    <div class="header-right">
+      <div class="arb-pill" id="arbPill">
+        <div class="status-dot"></div>
+        <span id="arbPillText">ARB RADAR</span>
+      </div>
+      <div class="status-pill" id="statusPill">
+        <div class="status-dot"></div>
+        <span id="statusText">IDLE</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- INFO BOX -->
+  <div class="info-box">
+    <strong>⚡ How the full system works:</strong><br>
+    1. Open <strong style="color:var(--text)">ArbRadar (index.html)</strong> in Tab 1<br>
+    2. Open <strong style="color:var(--text)">OddsEye (this page)</strong> in Tab 2<br>
+    3. Scan two bookmakers side by side (recording on PC, screenshot on mobile)<br>
+    4. Arb found → <strong style="color:var(--green)">automatically fires to ArbRadar</strong> with alert sound 🔔<br>
+    5. ArbRadar shows you <strong style="color:var(--green)">exactly how much to stake</strong> on each bookmaker for guaranteed profit<br><br>
+    <strong>Free AI:</strong> Uses Google Gemini 2.0 Flash — get your free key at <strong>aistudio.google.com</strong> (no credit card, 1500 req/day free).
+  </div>
+
+  <!-- API KEY -->
+  <div class="section-label">Google Gemini API Key (Free)</div>
+  <div class="api-row">
+    <input type="password" class="api-input" id="apiKeyInput" placeholder="Paste your Gemini API key here..." />
+    <button class="btn-save" onclick="saveKey()">Save Key</button>
+  </div>
+
+  <!-- ARB THRESHOLD -->
+  <div class="threshold-row">
+    <label>MIN ARB PROFIT</label>
+    <input type="range" id="thresholdSlider" min="0.5" max="5" step="0.5" value="1.5" oninput="updateThreshold(this.value)" />
+    <div class="threshold-val" id="thresholdVal">1.5%</div>
+  </div>
+
+  <!-- MODE SWITCHER -->
+  <div class="mode-switcher">
+    <button class="mode-btn active" id="modeBtnLive" onclick="switchMode('live')">
+      <span class="mode-icon">🖥️</span>
+      Live Recording
+      <span class="mode-badge">PC</span>
+    </button>
+    <button class="mode-btn" id="modeBtnShot" onclick="switchMode('screenshot')">
+      <span class="mode-icon">📸</span>
+      Screenshot
+      <span class="mode-badge">MOBILE</span>
+    </button>
+  </div>
+
+  <!-- LIVE RECORDING PANEL -->
+  <div class="mode-panel active" id="panelLive">
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <button class="btn btn-start" id="btnStart" onclick="startCapture()">
+      ⬤ Start Recording
+    </button>
+    <button class="btn btn-stop" id="btnStop" onclick="stopCapture()" disabled>
+      ◼ Stop
+    </button>
+  </div>
+
+  <!-- SCAN INTERVAL -->
+  <div class="interval-row">
+    <label>SCAN EVERY</label>
+    <input type="range" id="intervalSlider" min="2" max="15" value="4" oninput="updateInterval(this.value)" />
+    <div class="interval-val" id="intervalVal">4s</div>
+  </div>
+
+  <!-- PREVIEW -->
+  <div class="preview-section">
+    <div class="section-label">Screen Preview</div>
+    <div class="preview-box" id="previewBox">
+      <div class="preview-placeholder" id="placeholder">
+        <span class="icon">📡</span>
+        <p>Start recording to see<br>your screen here</p>
+      </div>
+      <video id="videoEl" autoplay muted playsinline></video>
+      <div class="scan-bar"></div>
+    </div>
+  </div>
+
+  </div><!-- end panelLive -->
+
+  <!-- SCREENSHOT PANEL -->
+  <div class="mode-panel" id="panelShot">
+
+    <div class="info-box" style="margin-bottom:16px;">
+      <strong>📱 Mobile Workflow:</strong> Open two bookmakers side by side in split screen → take a screenshot (Power + Vol Down) → upload it here → Gemini reads all odds from both bookies and detects arbs automatically.
+    </div>
+
+    <!-- Upload Zone -->
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="screenshotInput" accept="image/*" onchange="handleScreenshotUpload(event)" />
+      <div class="upload-icon">📷</div>
+      <div class="upload-label">
+        <strong>Tap to upload screenshot</strong>
+        Drop image here or tap to browse
+      </div>
+      <div class="upload-hint">JPG · PNG · WEBP · Any size</div>
+    </div>
+
+    <!-- Screenshot Preview -->
+    <div class="screenshot-preview" id="screenshotPreview">
+      <img id="screenshotImg" src="" alt="Screenshot preview" />
+      <button class="remove-img" onclick="removeScreenshot()">✕ Remove</button>
+    </div>
+
+    <!-- Scanning Overlay -->
+    <div class="scanning-overlay" id="scanningOverlay">
+      <span class="spin">⚙️</span>
+      Gemini is reading your screenshot...
+    </div>
+
+    <!-- Scan Button -->
+    <button class="btn-scan-shot" id="btnScanShot" onclick="scanScreenshot()" disabled>
+      🔍 Scan for Arbs
+    </button>
+
+  </div><!-- end panelShot -->
+
+  <!-- ARB ALERTS -->
+  <div class="arb-section">
+    <div class="matches-header">
+      <div class="section-label" style="margin:0">🔥 Arb Opportunities Detected</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div class="match-count" id="arbCount">0 arbs</div>
+        <button class="btn-clear" onclick="clearArbs()">Clear</button>
+      </div>
+    </div>
+    <div id="arbGrid">
+      <div class="empty-state" id="arbEmptyState">
+        <div class="big-icon">⚡</div>
+        <p>No arb opportunities yet.<br>Start recording with two bookies open side by side.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- MATCHES OUTPUT -->
+  <div class="matches-section">
+    <div class="matches-header">
+      <div class="section-label" style="margin:0">All Detected Matches & Markets</div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <div class="match-count" id="matchCount">0 matches</div>
+        <button class="btn-clear" onclick="clearMatches()">Clear</button>
+      </div>
+    </div>
+
+    <div class="matches-grid" id="matchesGrid">
+      <div class="empty-state" id="emptyState">
+        <div class="big-icon">🏟️</div>
+        <p>No matches detected yet.<br>Start recording and open your betting app.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="log-section">
+    <div class="section-label">System Log</div>
+    <div class="log-box" id="logBox"></div>
+  </div>
+
+</div>
+
+<!-- HIDDEN ELEMENTS -->
+<video id="videoEl" autoplay muted playsinline></video>
+<canvas id="canvasEl"></canvas>
+
+<script>
+// ===== STATE =====
+let mediaStream = null;
+let scanInterval = null;
+let apiKey = localStorage.getItem('oddsEyeGeminiKey') || '';
+let matchesData = [];
+let arbsData = [];
+let scanSeconds = 4;
+let minArbThreshold = 1.5;
+
+// BroadcastChannel to communicate with ArbRadar
+const arbChannel = new BroadcastChannel('arbradar_arbs');
+
+// Init
+if (apiKey) {
+  document.getElementById('apiKeyInput').value = apiKey;
+  log('Gemini API key loaded', 'ok');
+}
+
+// Listen for ArbRadar connection ping
+let arbRadarConnected = false;
+const pingChannel = new BroadcastChannel('arbradar_ping');
+pingChannel.onmessage = (e) => {
+  if (e.data === 'arbradar_ready' && !arbRadarConnected) {
+    arbRadarConnected = true;
+    document.getElementById('arbPill').classList.add('connected');
+    document.getElementById('arbPillText').textContent = 'ARB RADAR ✓';
+    log('ArbRadar connected!', 'ok');
+  }
+};
+
+function saveKey() {
+  const val = document.getElementById('apiKeyInput').value.trim();
+  if (!val) { log('Enter a valid Gemini API key first', 'err'); return; }
+  apiKey = val;
+  localStorage.setItem('oddsEyeGeminiKey', val);
+  log('Gemini API key saved', 'ok');
+}
+
+function updateInterval(val) {
+  scanSeconds = parseInt(val);
+  document.getElementById('intervalVal').textContent = val + 's';
+  if (scanInterval) {
+    clearInterval(scanInterval);
+    scanInterval = setInterval(doScan, scanSeconds * 1000);
+  }
+}
+
+function updateThreshold(val) {
+  minArbThreshold = parseFloat(val);
+  document.getElementById('thresholdVal').textContent = val + '%';
+  log(`Arb threshold set to ${val}%`, 'info');
+}
+
+function log(msg, type = 'info') {
+  const box = document.getElementById('logBox');
+  const line = document.createElement('span');
+  const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+  line.className = `log-line ${type}`;
+  line.textContent = `[${time}] ${msg}`;
+  box.appendChild(line);
+  box.appendChild(document.createElement('br'));
+  box.scrollTop = box.scrollHeight;
+}
+
+async function startCapture() {
+  if (!apiKey) {
+    log('Add your Gemini API key first', 'err');
+    return;
+  }
+
+  // Check if screen capture is supported (desktop only)
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+    log('Screen recording not supported on this device/browser', 'err');
+    log('Use the Screenshot tab instead — it works on mobile ✅', 'info');
+    // Auto-switch to screenshot mode
+    switchMode('screenshot');
+    return;
+  }
+
+  try {
+    log('Requesting screen access...', 'info');
+    mediaStream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: 5 },
+      audio: false
+    });
+
+    // Show video preview
+    const videoEl = document.getElementById('videoEl');
+    const previewBox = document.getElementById('previewBox');
+    const placeholder = document.getElementById('placeholder');
+
+    videoEl.srcObject = mediaStream;
+    videoEl.style.display = 'block';
+    placeholder.style.display = 'none';
+    previewBox.classList.add('scanning');
+
+    // Move video into preview box
+    previewBox.insertBefore(videoEl, previewBox.querySelector('.scan-bar'));
+
+    // Update UI
+    document.getElementById('btnStart').disabled = true;
+    document.getElementById('btnStop').disabled = false;
+    setStatus(true);
+
+    log('Screen capture started', 'ok');
+    log(`Scanning every ${scanSeconds}s — keep two bookies open side by side`, 'info');
+
+    // Start scanning
+    scanInterval = setInterval(doScan, scanSeconds * 1000);
+    setTimeout(doScan, 1000); // first scan quick
+
+    // Handle if user stops share from browser UI
+    mediaStream.getVideoTracks()[0].addEventListener('ended', () => {
+      stopCapture();
+    });
+
+  } catch (err) {
+    log('Screen access denied or cancelled', 'err');
+    console.error(err);
+  }
+}
+
+function stopCapture() {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(t => t.stop());
+    mediaStream = null;
+  }
+  if (scanInterval) {
+    clearInterval(scanInterval);
+    scanInterval = null;
+  }
+
+  const videoEl = document.getElementById('videoEl');
+  const previewBox = document.getElementById('previewBox');
+  const placeholder = document.getElementById('placeholder');
+
+  videoEl.style.display = 'none';
+  videoEl.srcObject = null;
+  placeholder.style.display = 'flex';
+  previewBox.classList.remove('scanning');
+
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  setStatus(false);
+  log('Recording stopped', 'err');
+}
+
+function setStatus(active) {
+  const pill = document.getElementById('statusPill');
+  const text = document.getElementById('statusText');
+  if (active) {
+    pill.classList.add('active');
+    text.textContent = 'LIVE';
+  } else {
+    pill.classList.remove('active');
+    text.textContent = 'IDLE';
+  }
+}
+
+// ===== GEMINI SCAN =====
+async function doScan() {
+  try {
+    const videoEl = document.getElementById('videoEl');
+    if (!videoEl.srcObject) return;
+
+    const canvas = document.getElementById('canvasEl');
+    canvas.width = videoEl.videoWidth || 1280;
+    canvas.height = videoEl.videoHeight || 720;
+
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+
+    const imageData = canvas.toDataURL('image/jpeg', 0.8);
+    const base64 = imageData.split(',')[1];
+
+    log('Scanning screen...', 'info');
+
+    const prompt = `You are a professional sports arbitrage analyst. This screenshot shows one or TWO bookmaker websites side by side (split screen).
+
+Your job:
+1. Identify EVERY bookmaker visible on screen and ALL their matches with ALL their available odds markets
+2. Find arbitrage opportunities between the two bookmakers for the SAME match and SAME market type
+3. Calculate implied probability and profit margin
+
+Sports covered: Football/Soccer, Basketball, Tennis, Rugby, Cricket, Baseball, Hockey, MMA, Boxing — ALL sports
+Markets covered: Match Winner (1X2), Home/Away (2-way), Over/Under Goals (any line), Both Teams To Score (BTTS), Asian Handicap, Double Chance, Draw No Bet, Correct Score, First Goal Scorer, Half Time/Full Time, Player Props, Set Winner (tennis), Quarter Winner (basketball), ANY visible market
+
+Return ONLY valid JSON, nothing else, no markdown:
+
+{
+  "bookmakers": [
+    {
+      "name": "BookmakerName or Unknown if not visible",
+      "matches": [
+        {
+          "team1": "Team/Player Name",
+          "team2": "Team/Player Name",
+          "sport": "football/basketball/tennis/etc",
+          "league": "league name if visible",
+          "time": "match time or kickoff",
+          "status": "live/upcoming/ht",
+          "markets": [
+            {
+              "market_type": "1X2/Over Under 2.5/BTTS/Asian Handicap/etc",
+              "outcomes": [
+                { "label": "Home/Over/Yes/Team1 -1.5/etc", "odds": 1.85 },
+                { "label": "Draw/Under/No/Team2 +1.5/etc", "odds": 2.10 },
+                { "label": "Away/etc", "odds": 3.50 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+CRITICAL RULES:
+- Extract EVERY market you can see, not just 1X2
+- If only one bookmaker is visible, still extract all its data
+- Only include real numbers you can read — never guess odds
+- Match team names exactly as shown
+- For Over/Under always include the line number (e.g. "Over 2.5" not just "Over")
+- If no betting data visible at all, return: {"bookmakers": []}`;
+
+    // Call Gemini 1.5 Flash (FREE)
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              {
+                inline_data: {
+                  mime_type: 'image/jpeg',
+                  data: base64
+                }
+              },
+              { text: prompt }
+            ]
+          }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 4096
+          }
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    if (data.error) {
+      log(`Gemini error: ${data.error.message}`, 'err');
+      return;
+    }
+
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!rawText) {
+      log('No response from Gemini', 'err');
+      return;
+    }
+
+    let parsed;
+    try {
+      const clean = rawText.replace(/```json|```/g, '').trim();
+      parsed = JSON.parse(clean);
+    } catch (e) {
+      log('Could not parse Gemini response', 'err');
+      return;
+    }
+
+    if (!parsed.bookmakers || parsed.bookmakers.length === 0) {
+      log('No betting data visible on screen', 'info');
+      return;
+    }
+
+    const totalMatches = parsed.bookmakers.reduce((sum, b) => sum + (b.matches?.length || 0), 0);
+    log(`Detected ${parsed.bookmakers.length} bookie(s), ${totalMatches} match(es)`, 'ok');
+
+    // Process matches for display
+    processMatchData(parsed.bookmakers);
+
+    // Run arb detection if 2+ bookmakers visible
+    if (parsed.bookmakers.length >= 2) {
+      detectArbs(parsed.bookmakers);
+    } else {
+      log('Only 1 bookie visible — open 2 side by side for arb detection', 'info');
+    }
+
+  } catch (err) {
+    log(`Scan error: ${err.message}`, 'err');
+  }
+}
+
+// ===== ARB DETECTION ENGINE =====
+function detectArbs(bookmakers) {
+  const foundArbs = [];
+
+  // Compare every bookmaker pair
+  for (let i = 0; i < bookmakers.length; i++) {
+    for (let j = i + 1; j < bookmakers.length; j++) {
+      const bookie1 = bookmakers[i];
+      const bookie2 = bookmakers[j];
+
+      if (!bookie1.matches || !bookie2.matches) continue;
+
+      // Match each match from bookie1 against bookie2
+      bookie1.matches.forEach(match1 => {
+        bookie2.matches.forEach(match2 => {
+          // Check if it's the same match (fuzzy name match)
+          if (!isSameMatch(match1, match2)) return;
+
+          // Compare markets
+          match1.markets?.forEach(market1 => {
+            match2.markets?.forEach(market2 => {
+              // Same market type?
+              if (!isSameMarket(market1.market_type, market2.market_type)) return;
+
+              // For 2-outcome markets (Over/Under, BTTS, Asian Handicap, 2-way)
+              if (market1.outcomes?.length === 2 && market2.outcomes?.length === 2) {
+                // Try: bookie1 outcome[0] + bookie2 outcome[1]
+                checkTwoWayArb(
+                  bookie1.name, market1.outcomes[0],
+                  bookie2.name, market2.outcomes[1],
+                  match1, market1.market_type, foundArbs
+                );
+                // Try: bookie1 outcome[1] + bookie2 outcome[0]
+                checkTwoWayArb(
+                  bookie1.name, market1.outcomes[1],
+                  bookie2.name, market2.outcomes[0],
+                  match1, market1.market_type, foundArbs
+                );
+              }
+
+              // For 3-outcome markets (1X2)
+              if (market1.outcomes?.length === 3 && market2.outcomes?.length === 3) {
+                // Best odds from each bookie per outcome
+                const outcomes = ['Home', 'Draw', 'Away'];
+                const bestOdds = outcomes.map((_, idx) => {
+                  const o1 = market1.outcomes[idx]?.odds || 0;
+                  const o2 = market2.outcomes[idx]?.odds || 0;
+                  return {
+                    label: market1.outcomes[idx]?.label || outcomes[idx],
+                    odds: Math.max(o1, o2),
+                    bookie: o1 >= o2 ? bookie1.name : bookie2.name
+                  };
+                });
+
+                const impliedSum = bestOdds.reduce((sum, o) => sum + (o.odds > 0 ? 1/o.odds : 0), 0);
+                if (impliedSum > 0 && impliedSum < 1) {
+                  const profit = ((1 / impliedSum) - 1) * 100;
+                  if (profit >= minArbThreshold) {
+                    foundArbs.push({
+                      match: `${match1.team1} vs ${match1.team2}`,
+                      sport: match1.sport || 'unknown',
+                      market: market1.market_type,
+                      profitMargin: profit.toFixed(2),
+                      legs: bestOdds.map(o => ({
+                        bookie: o.bookie,
+                        pick: o.label,
+                        odds: o.odds
+                      })),
+                      timestamp: new Date().toLocaleTimeString()
+                    });
+                  }
+                }
+              }
+            });
+          });
+        });
+      });
+    }
+  }
+
+  if (foundArbs.length > 0) {
+    foundArbs.forEach(arb => {
+      log(`🔥 ARB FOUND: ${arb.match} | ${arb.market} | +${arb.profitMargin}%`, 'arb');
+      addArbToDisplay(arb);
+      sendArbToRadar(arb);
+    });
+  }
+}
+
+function checkTwoWayArb(bookie1Name, outcome1, bookie2Name, outcome2, match, marketType, foundArbs) {
+  const odds1 = outcome1?.odds || 0;
+  const odds2 = outcome2?.odds || 0;
+  if (odds1 <= 1 || odds2 <= 1) return;
+
+  const impliedSum = (1/odds1) + (1/odds2);
+  if (impliedSum < 1) {
+    const profit = ((1 / impliedSum) - 1) * 100;
+    if (profit >= minArbThreshold) {
+      foundArbs.push({
+        match: `${match.team1} vs ${match.team2}`,
+        sport: match.sport || 'unknown',
+        market: marketType,
+        profitMargin: profit.toFixed(2),
+        legs: [
+          { bookie: bookie1Name, pick: outcome1.label, odds: odds1 },
+          { bookie: bookie2Name, pick: outcome2.label, odds: odds2 }
+        ],
+        timestamp: new Date().toLocaleTimeString()
+      });
+    }
+  }
+}
+
+function isSameMatch(match1, match2) {
+  const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const t1a = normalize(match1.team1);
+  const t1b = normalize(match1.team2);
+  const t2a = normalize(match2.team1);
+  const t2b = normalize(match2.team2);
+
+  // Direct match or reversed
+  return (
+    (t1a === t2a && t1b === t2b) ||
+    (t1a === t2b && t1b === t2a) ||
+    // Partial match (first word of team name)
+    (t1a.slice(0,4) === t2a.slice(0,4) && t1b.slice(0,4) === t2b.slice(0,4)) ||
+    (t1a.slice(0,4) === t2b.slice(0,4) && t1b.slice(0,4) === t2a.slice(0,4))
+  );
+}
+
+function isSameMarket(m1, m2) {
+  const normalize = (s) => (s || '').toLowerCase().replace(/[^a-z0-9.]/g, '');
+  return normalize(m1) === normalize(m2);
+}
+
+// ===== SEND ARB TO ARBRADAR =====
+function sendArbToRadar(arb) {
+  try {
+    arbChannel.postMessage({
+      type: 'ARB_DETECTED',
+      arb: arb
+    });
+    log(`Sent to ArbRadar: ${arb.match}`, 'ok');
+  } catch (e) {
+    log('Could not send to ArbRadar', 'err');
+  }
+}
+
+// ===== DISPLAY ARB =====
+function addArbToDisplay(arb) {
+  // Remove from existing or add
+  const existingIdx = arbsData.findIndex(a => a.match === arb.match && a.market === arb.market);
+  if (existingIdx >= 0) {
+    arbsData[existingIdx] = arb;
+  } else {
+    arbsData.unshift(arb);
+  }
+
+  const grid = document.getElementById('arbGrid');
+  document.getElementById('arbEmptyState').style.display = 'none';
+
+  // Rebuild arb cards
+  const existing = grid.querySelectorAll('.arb-alert');
+  existing.forEach(c => c.remove());
+
+  arbsData.forEach(a => {
+    const div = document.createElement('div');
+    div.className = 'arb-alert';
+    div.innerHTML = `
+      <div class="arb-header">
+        <div class="arb-profit">+${a.profitMargin}%</div>
+        <div class="arb-sport-badge">${a.sport}</div>
+      </div>
+      <div class="arb-match">${a.match}</div>
+      <div class="arb-market">📊 ${a.market}</div>
+      <div class="arb-legs">
+        ${a.legs.map(leg => `
+          <div class="arb-leg">
+            <div class="arb-leg-bookie">${leg.bookie}</div>
+            <div class="arb-leg-pick">${leg.pick}</div>
+            <div class="arb-leg-odds">${leg.odds}</div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="arb-sent-badge">Sent to ArbRadar • ${a.timestamp}</div>
+    `;
+    grid.appendChild(div);
+  });
+
+  document.getElementById('arbCount').textContent = `${arbsData.length} arb${arbsData.length !== 1 ? 's' : ''}`;
+}
+
+// ===== PROCESS MATCH DISPLAY =====
+function processMatchData(bookmakers) {
+  bookmakers.forEach(bookie => {
+    bookie.matches?.forEach(match => {
+      const key = `${match.team1}-${match.team2}`;
+      const existing = matchesData.findIndex(x => `${x.team1}-${x.team2}` === key);
+      const enriched = { ...match, bookieName: bookie.name };
+      if (existing >= 0) {
+        matchesData[existing] = enriched;
+      } else {
+        matchesData.unshift(enriched);
+      }
+    });
+  });
+
+  renderMatches();
+}
+
+function renderMatches() {
+  const grid = document.getElementById('matchesGrid');
+  document.getElementById('emptyState').style.display = 'none';
+
+  const existingCards = grid.querySelectorAll('.match-card');
+  existingCards.forEach(c => c.remove());
+
+  matchesData.forEach(m => {
+    const card = buildCard(m);
+    grid.appendChild(card);
+  });
+
+  document.getElementById('matchCount').textContent = `${matchesData.length} match${matchesData.length !== 1 ? 'es' : ''}`;
+}
+
+function buildCard(m) {
+  const div = document.createElement('div');
+  const isLive = m.status === 'live' || m.status === 'ht';
+  div.className = `match-card ${isLive ? 'live' : ''}`;
+
+  const scoreStr = (m.score1 !== null && m.score1 !== undefined)
+    ? `${m.score1} - ${m.score2}`
+    : 'vs';
+
+  const statusBadge = isLive ? `<span class="live-badge">LIVE</span>` : '';
+
+  const marketsHTML = (m.markets || []).map(mkt => {
+    const outcomesHTML = (mkt.outcomes || []).map(o => {
+      const v = o.odds;
+      const cls = typeof v === 'number' ? (v >= 10 ? 'very-high' : v >= 4 ? 'high' : '') : '';
+      return `
+        <div class="odd-box">
+          <div class="odd-label">${o.label}</div>
+          <div class="odd-value ${cls}">${v || '—'}</div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="market-group">
+        <div class="market-name">${mkt.market_type}</div>
+        <div class="odds-row">${outcomesHTML}</div>
+      </div>
+    `;
+  }).join('');
+
+  div.innerHTML = `
+    <div class="match-meta">
+      <span class="match-time">${m.time || ''}</span>
+      <span class="bookie-label">${m.bookieName || ''}</span>
+      <span class="match-league">${m.league || ''}</span>
+      ${statusBadge}
+    </div>
+    <div class="teams">
+      <span class="team-name">${m.team1}</span>
+      <span class="score">${scoreStr}</span>
+      <span class="team-name">${m.team2}</span>
+    </div>
+    <div class="markets-container">
+      ${marketsHTML || '<div style="color:var(--muted);font-size:0.8rem;">No markets extracted</div>'}
+    </div>
+  `;
+
+  return div;
+}
+
+function clearArbs() {
+  arbsData = [];
+  const grid = document.getElementById('arbGrid');
+  grid.querySelectorAll('.arb-alert').forEach(c => c.remove());
+  document.getElementById('arbEmptyState').style.display = 'block';
+  document.getElementById('arbCount').textContent = '0 arbs';
+  log('Arbs cleared', 'info');
+}
+
+// ===== MODE SWITCHER =====
+function switchMode(mode) {
+  document.getElementById('modeBtnLive').classList.toggle('active', mode === 'live');
+  document.getElementById('modeBtnShot').classList.toggle('active', mode === 'screenshot');
+  document.getElementById('panelLive').classList.toggle('active', mode === 'live');
+  document.getElementById('panelShot').classList.toggle('active', mode === 'screenshot');
+  log(`Switched to ${mode === 'live' ? 'Live Recording' : 'Screenshot'} mode`, 'info');
+}
+
+// ===== SCREENSHOT MODE =====
+let screenshotBase64 = null;
+
+function handleScreenshotUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    screenshotBase64 = dataUrl.split(',')[1];
+    const mimeType = file.type || 'image/jpeg';
+
+    // Show preview
+    document.getElementById('screenshotImg').src = dataUrl;
+    document.getElementById('screenshotPreview').style.display = 'block';
+    document.getElementById('uploadZone').style.display = 'none';
+    document.getElementById('btnScanShot').disabled = false;
+
+    log(`Screenshot loaded: ${file.name}`, 'ok');
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeScreenshot() {
+  screenshotBase64 = null;
+  document.getElementById('screenshotImg').src = '';
+  document.getElementById('screenshotPreview').style.display = 'none';
+  document.getElementById('uploadZone').style.display = 'flex';
+  document.getElementById('btnScanShot').disabled = true;
+  document.getElementById('screenshotInput').value = '';
+  log('Screenshot removed', 'info');
+}
+
+async function scanScreenshot() {
+  if (!screenshotBase64) { log('Upload a screenshot first', 'err'); return; }
+  if (!apiKey) { log('Add your Gemini API key first', 'err'); return; }
+
+  document.getElementById('btnScanShot').disabled = true;
+  document.getElementById('scanningOverlay').classList.add('active');
+  log('Scanning screenshot with Gemini...', 'info');
+
+  try {
+    const prompt = `You are a professional sports arbitrage analyst. This screenshot shows one or TWO bookmaker websites side by side (split screen on mobile).
+
+Your job:
+1. Identify EVERY bookmaker visible and ALL their matches with ALL available odds markets
+2. Find arbitrage opportunities between the two bookmakers for the SAME match and SAME market type
+3. Calculate implied probability and profit margin
+
+Sports covered: Football/Soccer, Basketball, Tennis, Rugby, Cricket, Baseball, Hockey, MMA, Boxing — ALL sports
+Markets covered: Match Winner (1X2), Home/Away (2-way), Over/Under Goals (any line), Both Teams To Score (BTTS), Asian Handicap, Double Chance, Draw No Bet, Correct Score, Half Time/Full Time, Player Props, Set Winner (tennis), Quarter Winner (basketball), ANY visible market
+
+Return ONLY valid JSON, nothing else, no markdown:
+
+{
+  "bookmakers": [
+    {
+      "name": "BookmakerName or Unknown if not visible",
+      "matches": [
+        {
+          "team1": "Team/Player Name",
+          "team2": "Team/Player Name",
+          "sport": "football/basketball/tennis/etc",
+          "league": "league name if visible",
+          "time": "match time or kickoff",
+          "status": "live/upcoming/ht",
+          "markets": [
+            {
+              "market_type": "1X2/Over Under 2.5/BTTS/Asian Handicap/etc",
+              "outcomes": [
+                { "label": "Home/Over/Yes/Team1 -1.5/etc", "odds": 1.85 },
+                { "label": "Draw/Under/No/Team2 +1.5/etc", "odds": 2.10 },
+                { "label": "Away/etc", "odds": 3.50 }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+
+CRITICAL RULES:
+- Extract EVERY market you can see, not just 1X2
+- If only one bookmaker is visible, still extract all its data
+- Only include real numbers you can read — never guess odds
+- Match team names exactly as shown
+- For Over/Under always include the line number (e.g. "Over 2.5" not just "Over")
+- If no betting data visible at all, return: {"bookmakers": []}`;
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { inline_data: { mime_type: 'image/jpeg', data: screenshotBase64 } },
+              { text: prompt }
+            ]
+          }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 4096 }
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    if (data.error) {
+      log(`Gemini error: ${data.error.message}`, 'err');
+      return;
+    }
+
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!rawText) { log('No response from Gemini', 'err'); return; }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(rawText.replace(/```json|```/g, '').trim());
+    } catch (e) {
+      log('Could not parse Gemini response', 'err');
+      return;
+    }
+
+    if (!parsed.bookmakers || parsed.bookmakers.length === 0) {
+      log('No betting data found in screenshot', 'info');
+      return;
+    }
+
+    const totalMatches = parsed.bookmakers.reduce((sum, b) => sum + (b.matches?.length || 0), 0);
+    log(`Screenshot: ${parsed.bookmakers.length} bookie(s), ${totalMatches} match(es) found`, 'ok');
+
+    processMatchData(parsed.bookmakers);
+
+    if (parsed.bookmakers.length >= 2) {
+      detectArbs(parsed.bookmakers);
+    } else {
+      log('Only 1 bookie detected in screenshot — open 2 side by side for arb detection', 'info');
+    }
+
+  } catch (err) {
+    log(`Screenshot scan error: ${err.message}`, 'err');
+  } finally {
+    document.getElementById('btnScanShot').disabled = false;
+    document.getElementById('scanningOverlay').classList.remove('active');
+  }
+}
+
+// Drag and drop support for upload zone
+// Auto-detect mobile and switch to screenshot mode
+document.addEventListener('DOMContentLoaded', () => {
+  const isMobile = !navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia;
+  if (isMobile) {
+    switchMode('screenshot');
+    log('Mobile detected — Screenshot mode activated', 'info');
+    // Update the live recording button to show it's PC only
+    const liveBtn = document.getElementById('modeBtnLive');
+    if (liveBtn) liveBtn.style.opacity = '0.5';
+  }
+
+  const zone = document.getElementById('uploadZone');
+  if (!zone) return;
+  zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    zone.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) {
+      const input = document.getElementById('screenshotInput');
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      input.files = dt.files;
+      handleScreenshotUpload({ target: input });
+    }
+  });
+});
+
+function clearMatches() {
+  matchesData = [];
+  const grid = document.getElementById('matchesGrid');
+  grid.querySelectorAll('.match-card').forEach(c => c.remove());
+  document.getElementById('emptyState').style.display = 'block';
+  document.getElementById('matchCount').textContent = '0 matches';
+  log('Matches cleared', 'info');
+}
+</script>
+</body>
+</html>
